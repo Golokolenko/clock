@@ -1,11 +1,13 @@
 
-
 #include <Servo.h>        // Библиотека серво, если используется серво
 #include <SPI.h>          // Библиотека SPI для MFRC522    
 #include <MFRC522.h>      // Библиотека RFID модуля MFRC522
 #include <EEPROM.h>       // Библиотека EEPROM для хранения ключей
 #include <Wire.h>
 #include <DS3231.h>
+enum Action {NONE, OPEN, CLOSE, ADD_CARD, REMOVE_CARD};
+Action lastAction = NONE;
+DateTime lastActionTime;
 #define LOCK_TIMEOUT  1000  // Время до блокировки замка после закрытия двери в мс 
 #define MAX_TAGS        3   // Максимальное количество хранимых меток - ключей 
 #define SERVO_PIN       2   // Пин серво
@@ -72,61 +74,23 @@ void setup() {
   pinMode(RED_LED_PIN, OUTPUT);
   pinMode(GREEN_LED_PIN, OUTPUT);
 
-  // Полная очистка при включении при зажатой кнопке
-  uint32_t start = millis();        // Отслеживание длительного удержания кнопки после включения
-  bool needClear = 0;               // Чистим флаг на стирание
-  while (!digitalRead(BTN_PIN)) {   // Пока кнопка нажата
-    if (millis() - start >= 3000) { // Встроенный таймаут на 3 секунды
-      needClear = true;             // Ставим флаг стирания при достижении таймаута
-      indicate(DELITED);            // Подаем сигнал удаления
-      break;                        // Выходим из цикла
-    }
-  }
+  // ... остальная часть вашей функции setup ...
 
-  // Инициализация EEPROM
-  if (needClear or EEPROM.read(EE_START_ADDR) != EE_KEY) { // при первом включении или необходимости очистки ключей
-    for (uint16_t i = 0; i < EEPROM.length(); i++) EEPROM.write(i, 0x00); // Чистим всю EEPROM
-    EEPROM.write(EE_START_ADDR, EE_KEY);                   // Пишем байт-ключ
-  } else {                                                 // Обычное включение
-    savedTags = EEPROM.read(EE_START_ADDR + 1);            // Читаем кол-во меток в памяти
-  }
-
-  // Начальное состояние замка
-  if (savedTags > 0) {      // Если метки в памяти есть
-    if (isOpen()) {         // И дверь сейчас открыта
-      ledSetup(SUCCESS);    // Зеленый лед
-      locked = false;       // Замок открыт
-      unlock();             // На всякий случай дернем замок
-    } else {                // Метки есть, но дверь закрыта
-      ledSetup(DECLINE);    // Красный лед
-      locked = true;        // Замок закрыт
-      lock();               // Блокируем замок
-    }
-  } else {                  // Если меток записано
-    ledSetup(SUCCESS);      // Зеленый лед
-    locked = false;         // Замок разлочен
-    unlock();               // На всякий случай разблокируем замок
-  }
-
+  // Вывод текущего времени
+  DateTime now = RTC.now(); // Получение текущей даты и времени
+  Serial.print(now.year(), DEC);
+  Serial.print("/");
+  Serial.print(now.month(), DEC);
+  Serial.print("/");
+  Serial.print(now.date(), DEC);
+  Serial.print(" ");
+  Serial.print(now.hour(), DEC);
+  Serial.print(":");
+  Serial.print(now.minute(), DEC);
+  Serial.print(":");
+  Serial.print(now.second(), DEC);
+  Serial.println();
 }
-void DateTime now = RTC.now(); //get the current date-time
-    Serial.print(now.year(), DEC);
-    Serial.print("/");
-    Serial.print(now.month(), DEC);
-    Serial.print("/");
-    Serial.print(now.date(), DEC);
-    Serial.print(" ");
-    Serial.print(now.hour(), DEC);
-    Serial.print(":");
-    Serial.print(now.minute(), DEC);
-    Serial.print(":");
-    Serial.print(now.second(), DEC);
-    Serial.println();
-    Serial.print(weekDay[now.dayOfWeek()]);
-    Serial.println();
-    delay(1000);
-}
-
 void loop() {
   static uint32_t lockTimeout;             // Таймер таймаута для блокировки замка
 
@@ -146,11 +110,11 @@ void loop() {
 
   // Блокировка замка по таймауту (ключей > 0, замок разлочен, таймаут вышел)
   if (savedTags > 0 and !locked and millis() - lockTimeout >= LOCK_TIMEOUT) {
+    printDateTime();                       // Добавьте этот вызов
     ledSetup(DECLINE); // Красный лед
     lock();            // Блокируем
     locked = true;     // Ставим флаг
   }
-
   // Поднесение метки
   static uint32_t rfidTimeout; // Таймаут рфид
   if (rfid.PICC_IsNewCardPresent() and rfid.PICC_ReadCardSerial()) { // Если поднесена карта
@@ -252,7 +216,23 @@ int16_t foundTag(uint8_t *tag, uint8_t size) {
   }
   return -1;                                // Если не нашли - вернем минус 1
 }
-
+void printDateTime() {
+  DateTime now = RTC.now(); //get the current date-time
+  Serial.print(now.year(), DEC);
+  Serial.print("/");
+  Serial.print(now.month(), DEC);
+  Serial.print("/");
+  Serial.print(now.date(), DEC);
+  Serial.print(" ");
+  Serial.print(now.hour(), DEC);
+  Serial.print(":");
+  Serial.print(now.minute(), DEC);
+  Serial.print(":");
+  Serial.print(now.second(), DEC);
+  Serial.println();
+  Serial.print(weekDay[now.dayOfWeek()]);
+  Serial.println();
+}
 // Удаление или запись новой метки
 void saveOrDeleteTag(uint8_t *tag, uint8_t size) {
   int16_t tagAddr = foundTag(tag, size);                      // Ищем метку в базе
