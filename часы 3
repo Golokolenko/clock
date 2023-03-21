@@ -1,9 +1,9 @@
+#include <DS3231.h>
 #include <Servo.h>        // Библиотека серво, если используется серво
 #include <SPI.h>          // Библиотека SPI для MFRC522    
 #include <MFRC522.h>      // Библиотека RFID модуля MFRC522
 #include <EEPROM.h>       // Библиотека EEPROM для хранения ключей
 #include <Wire.h>
-#include <RTClib.h>
 #define LOCK_TIMEOUT  1000  // Время до блокировки замка после закрытия двери в мс 
 #define MAX_TAGS        3   // Максимальное количество хранимых меток - ключей 
 #define SERVO_PIN       2   // Пин серво
@@ -19,11 +19,11 @@
 #define MISO_PIN       12   // Пин MISO MFRC522
 #define EE_START_ADDR  0  // Стартовый адрес для хранения данных в EEPROM
 #define EE_KEY         100 // Ключ для идентификации правильности данных в EEPROM
-enum Action {NONE, OPEN, CLOSE, ADD_CARD, REMOVE_CARD};
-Action lastAction = NONE;
-const char* weekDays[] = {"Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"};
-DateTime lastActionTime;
-RTC_DS3231 RTC; // Создаем экземпляр объекта DS3231
+
+
+DS3231 RTC; //Create the DS3231 object
+char weekDay[][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+DateTime dt(2011, 11, 10, 15, 18, 0);//open the series port and you can check time here or make a change to the time as needed.
 MFRC522 rfid(CS_PIN, RST_PIN); // Создаем экземпляр объекта MFRC522
 Servo doorServo;                // Обьект серво
 
@@ -59,18 +59,12 @@ uint8_t savedTags = 0;    // кол-во записанных меток
 
 void setup() {
   // Инициализируем все
-   Serial.begin(9600);
-  SPI.begin();
-  rfid.PCD_Init();
-  Wire.begin();
-  RTC.begin();
-
-  for (byte i = 0; i < 6; i++) {
-    key.keyByte[i] = 0xFF;
-  }
-  Serial.println(F("RFID-RC522"));
-  Serial.print(F("\nCard UID: "));
-};
+  Serial.begin(9600);               // Инициализация последовательного порта
+  SPI.begin();                      // Инициализация шины SPI
+  rfid.PCD_Init();         // Инициализация модуля MFRC522
+  rtc.begin();
+  rtc.setTime(0, 30, 14, 21, 3, 2023); // Set the time to 14:30:00 on March 21st, 2023
+}
 
   // Настраиваем пины
   pinMode(BTN_PIN, INPUT_PULLUP);
@@ -294,6 +288,7 @@ void saveOrDeleteTag(uint8_t *tag, uint8_t size) {
     ledSetup(SUCCESS);
   }
 }
+
 
 
 
