@@ -1,4 +1,3 @@
-
 #include <Servo.h>        // Библиотека серво, если используется серво
 #include <SPI.h>          // Библиотека SPI для MFRC522    
 #include <MFRC522.h>      // Библиотека RFID модуля MFRC522
@@ -80,7 +79,43 @@ void setup() {
   pinMode(RED_LED_PIN, OUTPUT);
   pinMode(GREEN_LED_PIN, OUTPUT);
 
-  // ... остальная часть вашей функции setup ...
+  // Полная очистка при включении при зажатой кнопке
+  uint32_t start = millis();        // Отслеживание длительного удержания кнопки после включения
+  bool needClear = 0;               // Чистим флаг на стирание
+  while (!digitalRead(BTN_PIN)) {   // Пока кнопка нажата
+    if (millis() - start >= 3000) { // Встроенный таймаут на 3 секунды
+      needClear = true;             // Ставим флаг стирания при достижении таймаута
+      indicate(DELITED);            // Подаем сигнал удаления
+      break;                        // Выходим из цикла
+    }
+  }
+
+  // Инициализация EEPROM
+  if (needClear or EEPROM.read(EE_START_ADDR) != EE_KEY) { // при первом включении или необходимости очистки ключей
+    for (uint16_t i = 0; i < EEPROM.length(); i++) EEPROM.write(i, 0x00); // Чистим всю EEPROM
+    EEPROM.write(EE_START_ADDR, EE_KEY);                   // Пишем байт-ключ
+  } else {                                                 // Обычное включение
+    savedTags = EEPROM.read(EE_START_ADDR + 1);            // Читаем кол-во меток в памяти
+  }
+
+  // Начальное состояние замка
+  if (savedTags > 0) {      // Если метки в памяти есть
+    if (isOpen()) {         // И дверь сейчас открыта
+      ledSetup(SUCCESS);    // Зеленый лед
+      locked = false;       // Замок открыт
+      unlock();             // На всякий случай дернем замок
+    } else {                // Метки есть, но дверь закрыта
+      ledSetup(DECLINE);    // Красный лед
+      locked = true;        // Замок закрыт
+      lock();               // Блокируем замок
+    }
+  } else {                  // Если меток записано
+    ledSetup(SUCCESS);      // Зеленый лед
+    locked = false;         // Замок разлочен
+    unlock();               // На всякий случай разблокируем замок
+  }
+
+}
 
   // Вывод текущего времени
   DateTime now = RTC.now(); // Получение текущей даты и времени
@@ -141,17 +176,17 @@ void loop() {
     rfidTimeout = millis();                                          // Обновляем таймаут
   }
 
-    // Перезагружаем RFID каждые 0.5 сек (для надежности)
-  static uint32_t rfidRebootTimer = millis();
-  if (millis() - rfidRebootTimer >= 500) {
-    rfid.PCD_Init(); // Инициализация RFID
-    rfidRebootTimer = millis(); // Обновляем таймер
+  // Перезагружаем RFID каждые 0.5 сек (для надежности)
+  static uint32_t rfidRebootTimer = millis(); // Таймер
+  if (millis() - rfidRebootTimer > 500) {     // Каждые 500 мс
+    rfidRebootTimer = millis();               // Обновляем таймер
     digitalWrite(RST_PIN, HIGH);              // Дергаем резет
     delay(1);
     digitalWrite(RST_PIN, LOW);
     rfid.PCD_Init();                          // Инициализируем модуль
   }
 }
+
 // Устанавливаем состояние светодиодов
 void ledSetup(bool state) {
   if (state) {  // Зеленый
@@ -202,7 +237,6 @@ void indicate(uint8_t signal) {
       return;
   }
 }
-
 // Сравнение двух массивов известного размера
 bool compareUIDs(uint8_t *in1, uint8_t *in2, uint8_t size) {
   for (uint8_t i = 0; i < size; i++) {  // Проходим по всем элементам
@@ -210,7 +244,6 @@ bool compareUIDs(uint8_t *in1, uint8_t *in2, uint8_t size) {
   }
   return true;                          // Все сошлись - массивы идентичны
 }
-
 // Поиск метки в EEPROM
 int16_t foundTag(uint8_t *tag, uint8_t size) {
   uint8_t buf[8];   // Буфер метки
@@ -261,3 +294,76 @@ void saveOrDeleteTag(uint8_t *tag, uint8_t size) {
     ledSetup(SUCCESS);
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
