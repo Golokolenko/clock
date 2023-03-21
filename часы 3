@@ -4,10 +4,7 @@
 #include <MFRC522.h>      // Библиотека RFID модуля MFRC522
 #include <EEPROM.h>       // Библиотека EEPROM для хранения ключей
 #include <Wire.h>
-#include <DS3231.h>
-enum Action {NONE, OPEN, CLOSE, ADD_CARD, REMOVE_CARD};
-Action lastAction = NONE;
-DateTime lastActionTime;
+#include <RTClib.h>
 #define LOCK_TIMEOUT  1000  // Время до блокировки замка после закрытия двери в мс 
 #define MAX_TAGS        3   // Максимальное количество хранимых меток - ключей 
 #define SERVO_PIN       2   // Пин серво
@@ -23,8 +20,11 @@ DateTime lastActionTime;
 #define MISO_PIN       12   // Пин MISO MFRC522
 #define EE_START_ADDR  0  // Стартовый адрес для хранения данных в EEPROM
 #define EE_KEY         100 // Ключ для идентификации правильности данных в EEPROM
-
-DS3231 RTC
+enum Action {NONE, OPEN, CLOSE, ADD_CARD, REMOVE_CARD};
+Action lastAction = NONE;
+const char* weekDays[] = {"Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"};
+DateTime lastActionTime;
+RTC_DS3231 RTC; // Создаем экземпляр объекта DS3231
 MFRC522 rfid(CS_PIN, RST_PIN); // Создаем экземпляр объекта MFRC522
 Servo doorServo;                // Обьект серво
 
@@ -61,9 +61,11 @@ uint8_t savedTags = 0;    // кол-во записанных меток
 void setup() {
   // Инициализируем все
   Serial.begin(9600);
+  if (!RTC.begin()) {
+  Serial.println("Couldn't find RTC");
+  while (1);
+}
   Wire.begin();
-  RTC.begin();
-  RTC.adjust(dt); //Adjust date-time as defined 'dt' above 
   SPI.begin();
   rfid.PCD_Init();
 
@@ -82,7 +84,7 @@ void setup() {
   Serial.print("/");
   Serial.print(now.month(), DEC);
   Serial.print("/");
-  Serial.print(now.date(), DEC);
+  Serial.print(now.day(), DEC);
   Serial.print(" ");
   Serial.print(now.hour(), DEC);
   Serial.print(":");
@@ -217,12 +219,12 @@ int16_t foundTag(uint8_t *tag, uint8_t size) {
   return -1;                                // Если не нашли - вернем минус 1
 }
 void printDateTime() {
-  DateTime now = RTC.now(); //get the current date-time
+  DateTime now = RTC.now(); // Добавьте круглые скобки после 'now'rr
   Serial.print(now.year(), DEC);
   Serial.print("/");
   Serial.print(now.month(), DEC);
   Serial.print("/");
-  Serial.print(now.date(), DEC);
+  Serial.print(now.day(), DEC);
   Serial.print(" ");
   Serial.print(now.hour(), DEC);
   Serial.print(":");
@@ -230,7 +232,7 @@ void printDateTime() {
   Serial.print(":");
   Serial.print(now.second(), DEC);
   Serial.println();
-  Serial.print(weekDay[now.dayOfWeek()]);
+  Serial.print(weekDays[now.dayOfTheWeek()]);
   Serial.println();
 }
 // Удаление или запись новой метки
